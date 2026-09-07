@@ -1,0 +1,12 @@
+{
+  "name": "terraform-node-aws",
+  "private": true,
+  "type": "module",
+  "description": "Scripts that support the Terraform in this repository. The infrastructure itself has no Node dependencies.",
+  "author": "Mohad Jillani <mohad.jillani@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "cost": "node scripts/cost-table.mjs",
+    "cost:check": "node scripts/cost-table.mjs --check"
+  }
+}

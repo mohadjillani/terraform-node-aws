@@ -1,0 +1,34 @@
+{
+  "note": "AWS list prices for eu-west-1, on-demand, captured by hand from the public pricing pages. Not a bill and not a quote: no Savings Plans, no Reserved Instances, no free tier, no data transfer beyond what is named below, and no tax.",
+  "region": "eu-west-1",
+  "captured": "2026-09-07",
+  "currency": "USD",
+  "hoursPerMonth": 730,
+  "natGatewayPerHour": 0.048,
+  "natGatewayPerGb": 0.048,
+  "vpcInterfaceEndpointPerHourPerAz": 0.011,
+  "albPerHour": 0.0252,
+  "albLcuPerHour": 0.008,
+  "fargateVcpuPerHour": 0.04656,
+  "fargateGbPerHour": 0.00511,
+  "rds": {
+    "db.t4g.micro": 0.018,
+    "db.t4g.small": 0.036,
+    "db.m7g.large": 0.201
+  },
+  "rdsStorageGbMonth": 0.137,
+  "secretPerMonth": 0.4,
+  "cloudwatchLogsIngestPerGb": 0.63,
+  "s3StorageGbMonth": 0.024,
+  "cloudfrontPerGb": {
+    "PriceClass_100": 0.085,
+    "PriceClass_All": 0.114
+  },
+  "assumptions": {
+    "natEgressGbPerMonth": 50,
+    "logsGbPerMonth": 10,
+    "assetsGbStored": 5,
+    "cdnGbServed": 100,
+    "albLcus": 2
+  }
+}
