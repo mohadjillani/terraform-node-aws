@@ -24,6 +24,10 @@ module "network" {
   # the egress.
   nat_gateway_count = 2
 
+  # On in prod, where deploy traffic through the NAT gateway costs more than
+  # the endpoints do.
+  enable_interface_endpoints = true
+
   tags = local.tags
 }
 

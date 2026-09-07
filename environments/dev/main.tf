@@ -24,6 +24,11 @@ module "network" {
   # environment whose downtime costs nothing.
   nat_gateway_count = 1
 
+  # Off in dev. `docs/cost.md` is generated from these files, and it shows the
+  # eight hourly endpoint charges costing more than the NAT egress they save at
+  # this traffic level. Prod leaves them on.
+  enable_interface_endpoints = false
+
   tags = local.tags
 }
 

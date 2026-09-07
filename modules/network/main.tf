@@ -127,6 +127,8 @@ resource "aws_vpc_endpoint" "s3" {
 }
 
 resource "aws_security_group" "endpoints" {
+  count = var.enable_interface_endpoints ? 1 : 0
+
   name        = "${var.name}-vpc-endpoints"
   description = "Allows the private subnets to reach interface endpoints"
   vpc_id      = aws_vpc.this.id
@@ -143,16 +145,19 @@ resource "aws_security_group" "endpoints" {
 }
 
 # Interface endpoints for the services a Fargate task talks to on every deploy.
-# These cost an hourly rate per AZ, and they are still cheaper than pulling
-# every image layer through a NAT gateway — the cost script shows both.
+#
+# Whether they pay for themselves depends on traffic, and `docs/cost.md`
+# answers it with numbers: at dev's volume the eight hourly charges cost more
+# than the NAT egress they remove, so dev turns them off. The S3 gateway
+# endpoint above is free and always on.
 resource "aws_vpc_endpoint" "interface" {
-  for_each = toset(["ecr.api", "ecr.dkr", "logs", "secretsmanager"])
+  for_each = var.enable_interface_endpoints ? toset(["ecr.api", "ecr.dkr", "logs", "secretsmanager"]) : toset([])
 
   vpc_id              = aws_vpc.this.id
   service_name        = "com.amazonaws.${data.aws_region.current.name}.${each.key}"
   vpc_endpoint_type   = "Interface"
   subnet_ids          = aws_subnet.private[*].id
-  security_group_ids  = [aws_security_group.endpoints.id]
+  security_group_ids  = [aws_security_group.endpoints[0].id]
   private_dns_enabled = true
 
   tags = merge(var.tags, { Name = "${var.name}-${each.key}" })

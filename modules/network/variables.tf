@@ -41,6 +41,23 @@ variable "nat_gateway_count" {
   }
 }
 
+variable "enable_interface_endpoints" {
+  description = <<-EOT
+    Interface endpoints for ECR, CloudWatch Logs and Secrets Manager.
+
+    They take image pulls and log shipping off the NAT gateway's per-gigabyte
+    charge — and they are billed per endpoint per availability zone, which for
+    four endpoints across two AZs is eight hourly charges.
+
+    The generated cost table decided this default: in a low-traffic dev
+    environment the endpoints cost more than the NAT egress they save, so dev
+    turns them off and prod leaves them on. Check `docs/cost.md` against your
+    own traffic rather than copying the answer.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "tags" {
   description = "Tags applied to every resource."
   type        = map(string)

@@ -136,9 +136,38 @@ run "endpoint_security_group_is_closed_to_the_internet" {
   }
 
   assert {
-    condition = alltrue([
-      for rule in aws_security_group.endpoints.ingress : !contains(rule.cidr_blocks, "0.0.0.0/0")
-    ])
+    condition = alltrue(flatten([
+      for group in aws_security_group.endpoints : [
+        for rule in group.ingress : !contains(rule.cidr_blocks, "0.0.0.0/0")
+      ]
+    ]))
     error_message = "The VPC endpoint security group is open to the internet."
+  }
+}
+
+# The S3 gateway endpoint is free and stays on regardless; the interface
+# endpoints are billed per AZ and are the ones the cost table argued about.
+run "interface_endpoints_can_be_turned_off_without_losing_the_s3_endpoint" {
+  module {
+    source = "./modules/network"
+  }
+
+  variables {
+    enable_interface_endpoints = false
+  }
+
+  assert {
+    condition     = length(aws_vpc_endpoint.interface) == 0
+    error_message = "Interface endpoints were created when they were disabled."
+  }
+
+  assert {
+    condition     = length(aws_security_group.endpoints) == 0
+    error_message = "The endpoint security group is left behind when the endpoints are gone."
+  }
+
+  assert {
+    condition     = length(aws_vpc_endpoint.s3.route_table_ids) == 2
+    error_message = "The free S3 gateway endpoint should not be affected."
   }
 }
