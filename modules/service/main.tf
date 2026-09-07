@@ -1,5 +1,4 @@
 data "aws_region" "current" {}
-data "aws_caller_identity" "current" {}
 
 resource "aws_cloudwatch_log_group" "this" {
   name              = "/ecs/${var.name}"
