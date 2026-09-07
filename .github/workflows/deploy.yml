@@ -1,0 +1,88 @@
+name: Deploy
+
+# Written, wired, and never run.
+#
+# There is no AWS account behind this repository. This workflow is what a
+# real one would look like: it plans on a pull request, posts the plan, and on
+# merge applies **the saved plan file** rather than re-planning — so what is
+# applied is what was reviewed.
+#
+# It needs `AWS_ROLE_ARN` (from `bootstrap/`) and nothing else: OIDC federation
+# means no long-lived access keys exist anywhere.
+on:
+  pull_request:
+    paths: ['modules/**', 'environments/**']
+  push:
+    branches: [main]
+    paths: ['modules/**', 'environments/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+concurrency: deploy-${{ github.ref }}
+
+jobs:
+  plan:
+    name: plan ${{ matrix.environment }}
+    if: ${{ vars.AWS_ROLE_ARN != '' }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.16.0'
+
+      - run: terraform -chdir=environments/${{ matrix.environment }} init -input=false
+      - name: Plan to a file
+        run: terraform -chdir=environments/${{ matrix.environment }} plan -input=false -out=tfplan
+
+      # The artifact is the contract between the review and the apply.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: environments/${{ matrix.environment }}/tfplan
+          retention-days: 5
+
+  apply:
+    name: apply the reviewed plan
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' && vars.AWS_ROLE_ARN != '' }}
+    needs: [plan]
+    runs-on: ubuntu-latest
+    # A human approves this environment before anything is applied.
+    environment: production
+    strategy:
+      # One environment at a time: dev first, so a broken change is caught
+      # somewhere it does not matter.
+      max-parallel: 1
+      matrix:
+        environment: [dev, prod]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: eu-west-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.16.0'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ matrix.environment }}
+          path: environments/${{ matrix.environment }}
+
+      - run: terraform -chdir=environments/${{ matrix.environment }} init -input=false
+      # The saved plan, not a fresh one. Re-planning here would apply whatever
+      # is true now rather than what was reviewed — and the state lock is what
+      # stops two runs doing that at once.
+      - run: terraform -chdir=environments/${{ matrix.environment }} apply -input=false tfplan

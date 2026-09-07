@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: '1.16.0'
+
+jobs:
+  check:
+    name: fmt, validate and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Formatting
+        run: terraform fmt -check -recursive
+
+      # Every module and every environment, initialised without a backend so
+      # this runs with no credentials and no state bucket.
+      - name: Validate every module and environment
+        run: |
+          for dir in modules/* environments/* bootstrap .; do
+            echo "==> $dir"
+            terraform -chdir="$dir" init -backend=false -input=false > /dev/null
+            terraform -chdir="$dir" validate
+          done
+
+      - uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: latest
+      - run: tflint --init
+      - name: Lint every module
+        run: |
+          for dir in modules/* environments/*; do
+            echo "==> $dir"
+            tflint --chdir="$dir" --config="$GITHUB_WORKSPACE/.tflint.hcl"
+          done
+
+  test:
+    name: terraform test
+    runs-on: ubuntu-latest
+    # The verification that matters. Mock providers plan the real configuration
+    # with no AWS account, and the assertions are policy — least privilege,
+    # nothing public, backups on — rather than a snapshot of the resource graph.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+      - run: terraform init -backend=false -input=false
+      - run: terraform test
+
+  cost:
+    name: the cost table matches the environments
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      # Regenerates docs/cost.md from the sizing in environments/* and fails if
+      # the committed table differs. A cost table that has drifted from the
+      # configuration is worse than none.
+      - run: npm run cost:check
